@@ -1,0 +1,130 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\hypersetup{
+  pdftitle={Project Memo},
+  pdfauthor={Katherine Bayt},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+\urlstyle{same} % disable monospaced font for URLs
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+
+\title{Project Memo}
+\author{Katherine Bayt}
+\date{2022-04-10}
+
+\begin{document}
+\maketitle
+
+\hypertarget{overview-of-the-dataset}{%
+\subsection{Overview of the Dataset}\label{overview-of-the-dataset}}
+
+For the final project, I will be using a Movie Industry dataset derived
+from kaggle. The dataset includes 15 different variable: • Movie title
+with budget, production company, country of origin, director, genre,
+gross revenue, rating of movie, release date, duration of movie, IMDb
+user rating, number of user votes, main actors and actresses, writer of
+the movie, and year of release. The dataset has about 6820 observations
+and 14 predictors. I will be working with a mix of cateogorical and
+numerical variables. There appears to be a few missing values, mainly in
+the budget column. Due to the large amount of observations I have, I
+will most likely remove any obervations that have missing data. The
+dataset will be downloaded from
+\url{https://www.kaggle.com/datasets/danielgrijalvas/movies}.
+
+\hypertarget{an-overview-of-the-research-questions}{%
+\subsection{An Overview of the Research
+Question(s)}\label{an-overview-of-the-research-questions}}
+
+The variable I am most interested in predicting from this dataset is the
+IMdb user rating score. I am interested in answering a few questions
+including what is the relationship between the movie budget and the IMDb
+rating score? Are there some directors that, on average, have a higher
+IMDb user rating score? Is there a relationship between movie duration
+and number of user votes? If a movie is longer on average, are there
+more or less votes? Is there a genere that is more popular than others?
+My response/outcome variable will be the IMDb user rating score which is
+a numerical value between 1 and 10 where 1 is the lowest score and 10 is
+the highest. I believe that these questions and prediction will best be
+answered with a regression model because I want to predict a numerical
+value. The variables that I think will be the most useful are budget,
+director, movie starts, genre, and duration. The overall goal of my
+model is predictive, because I am aiming to predict the user IMDb rating
+score based off of the most prevelant predictors.
+
+\hypertarget{proposed-project-timeline}{%
+\subsection{Proposed Project Timeline}\label{proposed-project-timeline}}
+
+My plan for my project is to keep up with the suggested timeline in the
+course syllabus. I plan to finish uploading and tidyng my data by the
+end of week 3, run and write up my descriptive analysis in week 4 and 5,
+run models in week 6, write up my results in week 7, work on my first
+draft of the paper in week 8, make edits and start the final draft in
+week 9, and finish the last corrections ans sumbit in week 10. I hope to
+work on my first draft as I work, so hopefully the last few weeks of the
+timeline will be ahead of schedule.
+
+\hypertarget{questions-and-concerns}{%
+\subsection{Questions and Concerns}\label{questions-and-concerns}}
+
+The only problems I anticipate is deciding how I want to split up my
+training and testing variables. Will 15 different predictors it will be
+hard to have a good distribution of all of them, so I am currently
+planning on getting an equal distribution for the IMDb ratings for each
+data set. At the moment, I do not have any specific questions.
+
+\end{document}

@@ -1,0 +1,28 @@
+---
+title: "Project Memo"
+author: "Katherine Bayt"
+date: '2022-04-10'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview of the Dataset
+
+For the final project, I will be using a Movie Industry dataset derived from kaggle. The dataset includes 15 different variable: 	• Movie title with budget, production company, country of origin, director, genre, gross revenue, rating of movie, release date, duration of movie, IMDb user rating, number of user votes, main actors and actresses, writer of the movie, and year of release. The dataset has about 6820 observations and 14 predictors. I will be working with a mix of cateogorical and numerical variables. There appears to be a few missing values, mainly in the budget column. Due to the large amount of observations I have, I will most likely remove any obervations that have missing data. The dataset will be downloaded from https://www.kaggle.com/datasets/danielgrijalvas/movies. 
+
+
+## An Overview of the Research Question(s)
+The variable I am most interested in predicting from this dataset is the IMdb user rating score. I am interested in answering a few questions including what is the relationship between the movie budget and the IMDb rating score? Are there some directors that, on average, have a higher IMDb user rating score? Is there a relationship between movie duration and number of user votes? If a movie is longer on average, are there more or less votes? Is there a genere that is more popular than others? My response/outcome variable will be the IMDb user rating score which is a numerical value between 1 and 10 where 1 is the lowest score and 10 is the highest. I believe that these questions and prediction will best be answered with a regression model because I want to predict a numerical value. The variables that I think will be the most useful are budget, director, movie starts, genre, and duration. The overall goal of my model is predictive, because I am aiming to predict the user IMDb rating score based off of the most prevelant predictors. 
+
+## Proposed Project Timeline
+My plan for my project is to keep up with the suggested timeline in the course syllabus. I plan to finish uploading and tidyng my data by the end of week 3, run and write up my descriptive analysis in week 4 and 5, run models in week 6, write up my results in week 7, work on my first draft of the paper in week 8, make edits and start the final draft in week 9, and finish the last corrections ans sumbit in week 10. I hope to work on my first draft as I work, so hopefully the last few weeks of the timeline will be ahead of schedule.
+
+## Questions and Concerns
+The only problems I anticipate is deciding how I want to split up my training and testing variables. Will 15 different predictors it will be hard to have a good distribution of all of them, so I am currently planning on getting an equal distribution for the IMDb ratings for each data set. At the moment, I do not have any specific questions. 
+
+
