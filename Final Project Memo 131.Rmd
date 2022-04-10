@@ -3,8 +3,8 @@ title: "Project Memo"
 author: "Katherine Bayt"
 date: '2022-04-10'
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Overview of the Dataset
 
-For the final project, I will be using a Movie Industry dataset derived from kaggle. The dataset includes 15 different variable: 	• Movie title with budget, production company, country of origin, director, genre, gross revenue, rating of movie, release date, duration of movie, IMDb user rating, number of user votes, main actors and actresses, writer of the movie, and year of release. The dataset has about 6820 observations and 14 predictors. I will be working with a mix of cateogorical and numerical variables. There appears to be a few missing values, mainly in the budget column. Due to the large amount of observations I have, I will most likely remove any obervations that have missing data. The dataset will be downloaded from https://www.kaggle.com/datasets/danielgrijalvas/movies. 
+For the final project, I will be using a Movie Industry dataset derived from kaggle. The dataset includes 15 different variable: Movie title with budget, production company, country of origin, director, genre, gross revenue, rating of movie, release date, duration of movie, IMDb user rating, number of user votes, main actors and actresses, writer of the movie, and year of release. The dataset has about 6820 observations and 14 predictors. I will be working with a mix of cateogorical and numerical variables. There appears to be a few missing values, mainly in the budget column. Due to the large amount of observations I have, I will most likely remove any obervations that have missing data. The dataset will be downloaded from https://www.kaggle.com/datasets/danielgrijalvas/movies. 
 
 
 ## An Overview of the Research Question(s)
