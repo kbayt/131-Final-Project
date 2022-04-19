@@ -1,0 +1,80 @@
+---
+title: "Final Project Tidy Data"
+author: "Katherine Bayt"
+date: '2022-04-19'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(tidymodels)
+library(corrplot)
+library(ggthemes)
+tidymodels_prefer()
+library(ISLR)
+library(yardstick)
+library(tidyr)
+library(devtools)
+library(stringr)
+movies <- read.csv("C:\\movies.csv")
+view(movies)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## LOADING AND TIDYING DATA 
+
+First, I separated the released column into date released and country released from.
+```{r warning = FALSE}
+movies <- separate(movies, released, c("date_released", "country_released"),
+                    sep = "\\(")
+movies$country_released <- gsub("\\)", "", as.character(movies$country_released))
+```
+Next, I seperated data released into month released and year released. I removed the day of the month because it was not pertinent to my data. 
+```{r warning=FALSE}
+# separate data released into month + day released and year released
+movies <- separate(movies, date_released, c("month_released","year_released"),
+                    sep = ",")
+view(movies)
+
+# remove day from month_released (bc day irrelevant)
+movies$month_released <- substr(movies$month_released,1, nchar(movies$month_released)-2)
+```
+I then renamed country into country_created and year into year_created. This way, the different years and country columns will not be mixed up.
+```{r}
+movies <- movies %>% rename(country_created = country, 
+                   year_created = year)
+```
+
+Now that the data set is divided up into columns accordingly, I started removing observations with missing values, cleaning whitespace, and removed an observation with a different viewer rating than the rest. I decided to remove values with NA rather than fill in with the average value because I had such a large dataset to begin with, and the values that were missing I viewed as most important for predicting my outcome variable. 
+```{r}
+# remove 1 observation with viewing rating different from rest
+movies1 <- movies[-c(121), ]
+
+# remove trailing white space in month_released
+movies1$month_released <- str_trim(movies1$month_released)
+
+# replace missing values with NA
+movies1[movies1 == ""] <- NA
+
+# removing observations with NA (about 2000)
+movies1 <- na.omit(movies1)
+```
+
+Then, since all the data was cleaned up and the missing values were dealt with, I decided to factorize my month_created and my rating data columns. I wanted month_created to be viewable in the correct order so that any seasonality trends would be easy to view. I wanted the rating to be viewable from child-viewing to adult-viewing so I can see the effect on different age groups on my outcome variable. 
+```{r}
+# factor month_released with levels refering to month number 
+movies1$month_released <- factor(movies1$month_released, levels = c(
+  "January", "Febuary", "March", "April", "May", "June", "July",
+  "August", "September", "October", "November", "December")
+)
+
+### combine unrated and non rated rating into same category
+movies1[movies1 == "Unrated"] <- "Not Rated"
+
+# factor rating into levels to organize from child viewing to adult
+movies1$rating <- factor(movies1$rating, levels = c(
+  "G", "PG", "PG-13", "TV-MA", "R", "X", "NC-17", "Not Rated"))
+view(movies1)
+```
+
