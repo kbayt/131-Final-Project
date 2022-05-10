@@ -7,7 +7,6 @@ tidymodels_prefer()
 library(ISLR)
 library(yardstick)
 library(tidyr)
-install.packages("devtools")
 library(devtools)
 library(stringr)
 
@@ -73,4 +72,11 @@ movies1$rating <- factor(movies1$rating, levels = c(
 movies1 <- movies1 %>% rename(country_created = country, 
                    year_created = year)
 view(movies1)
+
+# turn year_released into numeric 
+movies1$year_released <- as.numeric(movies1$year_released)
+view(movies1)
+
+# remove year_created (positive 1 correlation with year_released)
+movies1 <- subset(movies1, select= -year)
 
