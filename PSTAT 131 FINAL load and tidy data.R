@@ -9,7 +9,9 @@ library(yardstick)
 library(tidyr)
 library(devtools)
 library(stringr)
-
+library(discrim)
+library(corrr)
+library(glmnet)
 movies <- read.csv("C:\\movies.csv")
 view(movies)
 
