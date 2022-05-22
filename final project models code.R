@@ -1,3 +1,11 @@
+library(rpart.plot)
+library(xgboost)
+library(ranger)
+library(randomForest)
+library(vip)
+
+
+
 ## MODELSSS
 view(movies1)
 # split the data
@@ -18,7 +26,7 @@ movies_recipe <- recipe(score~ runtime + votes + genre +
   step_other(company, threshold = 40) %>%
   step_other(director, threshold = 15) %>%
   step_other(writer, threshold = 5) %>%
-  step_dummy(all_nominal_predictors()) %>%
+  step_dummy(genre) %>%
   step_normalize(all_predictors())
 
 # 1. LINEAR REGRESSION
@@ -51,7 +59,7 @@ movies_train_lm_res %>%
   coord_obs_pred()
 ## LM DOES NOT PREDICT WELL!!!
 
-# 2. RIDGE REGRESSION
+# 2. RIDGE REGRESSION (or lasso)
 ridge_spec <- linear_reg(mixture=0,
                          penalty=tune()) %>%
   set_mode("regression") %>%
@@ -96,3 +104,71 @@ movies_train_ridge_res %>%
   geom_abline(lty = 2) +
   theme_bw() +
   coord_obs_pred()
+
+# 3. PRUNED TREE (no tuning)
+# create spec for pruned tree
+pruned_tree_model <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("regression")
+# create workflow
+pruned_tree_wkflow <- workflow() %>%
+  add_model(pruned_tree_model) %>%
+  add_recipe(movies_recipe)
+# fit
+pruned_tree_fit <- fit(pruned_tree_wkflow,
+                       data = movies_train)
+# visualize tree
+pruned_tree_fit %>%
+  extract_fit_engine() %>%
+  rpart.plot()
+# output rmse on training data
+augment(pruned_tree_fit, new_data = movies_train) %>%
+  rmse(truth = score, estimate=.pred)
+
+# 4. PRUNED TREE WITH TUNING ON COST_COMPLEXITY 
+# workflow
+pruned_tree_tune_wkflow <- workflow() %>%
+  add_model(pruned_tree_model %>%
+              set_args(cost_complexity = tune())) %>%
+  add_recipe(movies_recipe)
+# create grid for values of cost complexity 
+pruned_cost_grid <- grid_regular(cost_complexity(range(-3,-1)), 
+                                 levels=10)
+# tune
+pruned_tune_res <- tune_grid(
+  pruned_tree_tune_wkflow,
+  resamples = movies_fold,
+  grid = pruned_cost_grid)
+autoplot(pruned_tune_res)
+# model achieves best value at lowest cost-complexity 
+# need a more complex model 
+# we will fit this model, but we are going
+## to need a random forest 
+# get best complexity 
+best_complexity <- select_best(pruned_tune_res,
+                               metric = "rmse")
+pruned_tree_tune_final <- finalize_workflow(
+  pruned_tree_tune_wkflow, best_complexity)
+pruned_tree_tune_final_fit <- fit(
+  pruned_tree_tune_final,
+  data = movies_train)
+# visualize the model
+pruned_tree_tune_final_fit %>%
+  extract_fit_engine() %>%
+  rpart.plot()
+# check performance
+augment(pruned_tree_tune_final_fit,
+        new_data = movies_train) %>%
+  rmse(truth = score, estimate = .pred)
+# get value of 0.7 - not best, want lower
+augment(pruned_tree_tune_final_fit,
+        new_data = movies_train) %>%
+  ggplot(aes(score, .pred)) +
+  geom_abline() +
+  geom_point(alpha = 0.5)
+# need more complex model!
+
+# LAST MODEL WILL BE NEAREST NEIGHBORS 
+
+
+
