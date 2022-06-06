@@ -31,6 +31,7 @@ library(kknn)
 movies <- read.csv("C:\\Users\\kathe\\OneDrive\\Desktop\\PSTAT 131\\131-Final-Project\\Data\\movies.csv")
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, 
                       warning = FALSE)
+view(movies)
 ```
 
 ## INTRODUCTION 
@@ -844,6 +845,10 @@ augment(knn_final_fit,
 Overall, our optimal model of nearest neighbors did not perform well on the testing data. We received an rmse score of 0.7758 which is relatively high, and from the plot above we can see that our model does not predict the outcome very well.The model appears to have low bias and high variance where the predicted values have a large range around the actual values. 
 
 ## CONCLUSION 
-Overall, from the result of our final model tested against the test data, we saw that our model did not predict very well. This could be due to leaving out certain variable that we did not consider important during the EDA and could also be due to the thresholds we created in our recipe. We must also keep in mind that a movie rating is highly subjective, and everyone's rating criterion might be different in how it related to the predictors in our models. In order for our model to correctly predict a rating, it might have to be on an individual rather than group level. For example, it would be interesting to use my personal Netflix data and the ratings I had given on movies to predict future ratings. 
+Looking at all our models, the pruned tree achieved an rmse of 0.729, the random forest achieved 0.741, the boosted tree achieved 0.679, and the nearest neighbor model achieved 0.540. Thus our nearest neighbor model worked best on our training set. I was surprised that the pruned tree had a lower rmse than the random forest, since our cost-complexity parameters graph appeared to do better with a more complex model.
+
+I decided to choose these 4 models due to the high number of categorical variables in my data set. 
+
+Overall, from the result of our final model tested against the test data, we saw that our model did not predict very well. This could be due to leaving out certain variables that we did not consider important during the EDA and could also be due to the thresholds we created in our recipe. We must also keep in mind that a movie rating is highly subjective, and everyone's rating criterion might be different in how it related to the predictors in our models. In order for our model to correctly predict a rating, it might have to be on an individual rather than group level. For example, it would be interesting to use my personal Netflix data and the ratings I had given on movies to predict future ratings. 
 
 Regardless of the outcome of the model, the movies data set was an interesting way to see what were the most influential parameters when predicting the score of a movie. 
