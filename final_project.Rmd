@@ -28,8 +28,7 @@ library(randomForest)
 library(vip)
 library(glmnet)
 library(kknn)
-movies <- read.csv("C:\\movies.csv")
-view(movies)
+movies <- read.csv("C:\\Users\\kathe\\OneDrive\\Desktop\\PSTAT 131\\131-Final-Project\\Data\\movies.csv")
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, 
                       warning = FALSE)
 ```
@@ -666,7 +665,7 @@ save(rf_param_res, rf_wkflow, file = "random_forest_runs.rda")
 After tuning the model, I output the results in order to see the effects of different minimal node size, predictors, and trees on the rmse value of the folds.
 
 ```{r RF Plot of tuning, echo=TRUE}
-load(file = "random_forest_runs.rda")
+load(file = "C:\\Users\\kathe\\OneDrive\\Desktop\\PSTAT 131\\131-Final-Project\\Data\\random_forest_runs.rda")
 autoplot(rf_param_res, metric = "rmse")
 ```
 
@@ -736,7 +735,8 @@ save(boost_param_res, boost_wkflow, file = "boosted_runs.rda")
 Let's visualize the results of different parameter values.
 
 ```{r}
-load(file = "boosted_runs.rda")
+load(file = "C:\\Users\\kathe\\OneDrive\\Desktop\\PSTAT 131\\131-Final-Project\\Data\\boosted_runs.rda")
+
 autoplot(boost_param_res,metric = "rmse")
 ```
 
