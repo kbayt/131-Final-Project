@@ -1,0 +1,849 @@
+---
+title: "Final Project"
+author: "Katherine Bayt"
+date: '2022-04-19'
+output: 
+    html_document:
+      toc: true
+      toc_float: true 
+      code_folding: show 
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(tidymodels)
+library(corrplot)
+library(ggthemes)
+tidymodels_prefer()
+library(ISLR)
+library(yardstick)
+library(tidyr)
+library(devtools)
+library(stringr)
+library(rpart.plot)
+library(xgboost)
+library(ranger)
+library(randomForest)
+library(vip)
+library(glmnet)
+library(kknn)
+movies <- read.csv("C:\\movies.csv")
+view(movies)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, 
+                      warning = FALSE)
+```
+
+## INTRODUCTION 
+The purpose of this model is to generate a model that will predict the user IMDb rating for a specific movie.
+
+### User IMDb Rating
+The user IMDB rating allows userts to rate a movie on a scale of 1 to 10, where 1 is the lowest and 10 is the highest. The IMDB rating is filtered and weighted in a certain way (that is not released to the public) depending on where the score comes from. 
+
+### Why might this model be useful?
+In a time period where companies (such as Netflix, Hulu, Prime, etc.) use entertainment as their main source of company profits, it would be beneficial to see the overall score a movie would receive in order to decide if the movie should be uploaded on the platform.
+
+## LOADING AND TIDYING DATA
+
+First, I separated the released column into date released and country released from.
+
+```{r warning = FALSE}
+movies <- separate(movies, released, c("date_released", "country_released"),
+                    sep = "\\(")
+movies$country_released <- gsub("\\)", "", as.character(movies$country_released))
+```
+
+Next, I separated data released into month released and year released. I removed the day of the month because it was not pertinent to my data.
+
+```{r warning=FALSE}
+# separate data released into month + day released and year released
+movies <- separate(movies, date_released, c("month_released","year_released"),
+                    sep = ",")
+view(movies)
+
+# remove day from month_released (bc day irrelevant)
+movies$month_released <- substr(movies$month_released,1, nchar(movies$month_released)-2)
+```
+
+I then renamed country into country_created and year into year_created. This way, the different years and country columns will not be mixed up.
+
+```{r}
+movies <- movies %>% rename(country_created = country, 
+                   year_created = year)
+```
+
+Now that the data set is divided up into columns accordingly, I started removing observations with missing values, cleaning white space, and removed an observation with a different viewer rating than the rest. I decided to remove values with NA rather than fill in with the average value because I had such a large data set to begin with, and the values that were missing I viewed as most important for predicting my outcome variable.
+
+```{r}
+# remove 1 observation with viewing rating different from rest
+movies1 <- movies[-c(121), ]
+
+# remove trailing white space in month_released
+movies1$month_released <- str_trim(movies1$month_released)
+
+# replace missing values with NA
+movies1[movies1 == ""] <- NA
+
+# removing observations with NA (about 2000)
+movies1 <- na.omit(movies1)
+```
+
+Then, since all the data was cleaned up and the missing values were dealt with, I decided to factorize my month_created and my rating data columns. I wanted month_created to be view able in the correct order so that any seasonality trends would be easy to view. I wanted the rating to be view able from child-viewing to adult-viewing so I can see the effect on different age groups on my outcome variable. Within my rating variable I also combined "Unrated" and "Not Rated" observations to all be "Not Rated". I also combined "R", "TV-MA", "NC-17" and "X" ratings all into R ratings. This is due to the fact that they all represent viewers requiring parents supervision if 17 years old or younger. There was also a small amount of TV-MA, NC-17, and X rating and believe that viewing the effect of the rating variable will be easier if these small observations are grouped in a bigger category.
+
+```{r}
+# factor month_released with levels refering to month number 
+movies1$month_released <- factor(movies1$month_released, levels = c(
+  "January", "Febuary", "March", "April", "May", "June", "July",
+  "August", "September", "October", "November", "December")
+)
+
+### combine unrated and non rated rating into same category
+movies1[movies1 == "Unrated"] <- "Not Rated"
+
+### combine TV-MA, R, X, NC-17 as all R
+movies1[movies1 == "TV-MA" | movies1 == "X" | movies1 == "NC-17"] <- "R"
+
+# factor rating into levels to organize from child viewing to adult
+movies1$rating <- factor(movies1$rating, levels = c(
+  "G", "PG", "PG-13", "R", "Not Rated"))
+view(movies1)
+
+# factor genre into levels
+movies1$genre <- factor(movies1$genre)
+```
+
+Next, I created a column discrete_run time so that I can use the run time as a categorical variable within my exploratory descriptive analysis. I split the run time into periods of 60, 90, 120, 150, 180, 210, 240, and 280 minutes.
+
+```{r}
+discrete_runtime <- cut(movies1$runtime,
+                        breaks = c(59,90,120,150,180,210,240,280))
+movies1$discrete_runtime <- discrete_runtime    
+```
+
+Lastly, I turned my year_released variable into numeric. I also removed year_created because it has a positive 1 correlation with year_released, and thus I will only need one of the variables for my model.
+
+```{r}
+# turn year_released into numeric 
+movies1$year_released <- as.numeric(movies1$year_released)
+view(movies1)
+# remove year_created (positive 1 correlation with year_released)
+movies1 <- subset(movies1, select= -year_created)
+```
+
+## DESCRIPTIVE ANALYSIS
+
+First, let's look at the distribution of the outcome variable score.
+
+```{r}
+movies1 %>%
+  ggplot(aes(x = score)) +
+  geom_histogram(bins = 60) +
+  theme_bw()
+```
+
+We can see that the distribution of score has a leftward skew. Thus, we can see that we have less observations that are smaller scores. Lets compare this distribution of score for each of the different ratings. I will split these up so that the smaller distributions are on a smaller scale, and the larger distributions are on a larger scale to better view the data.
+
+```{r}
+movies1 %>%
+  filter(rating == "PG" | rating == "PG-13" | rating == "R") %>%
+  ggplot(aes(x=score)) +
+  geom_histogram(bins=30, color = "white") +
+  facet_wrap(~rating)+
+  labs(title = "Histogram of Score by Rating")
+```
+
+```{r}
+movies1 %>%
+  filter(rating == "G" | rating == "Not Rated") %>%
+  ggplot(aes(x=score)) +
+  geom_histogram(bins=30, color = "white") +
+  facet_wrap(~rating)+
+  labs(title = "Histogram of Score by Rating")
+```
+
+We can see that the distribution of score by rating appears to also have the leftward skew represented in the distribution of score, except for "Not Rated" which has a smaller leftward skew. From this brief analysis of the relationship between ratings and score, I believe that rating will not have a great effect on the outcome of score. Lets develop this relationship further to confirm that rating is not an important factor.
+
+Lets look at the distribution of rating within that of score.
+
+```{r}
+movies1 %>%
+  ggplot(aes(x = score, fill = rating)) +
+  geom_histogram(bins = 60) +
+  theme_bw()
+```
+
+```{r}
+movies1 %>%
+  arrange(-score) %>%
+  select(score, rating) %>%
+  head(100) %>%
+  ggplot(aes(x = score, fill=rating)) +
+  geom_histogram() +
+  theme_bw() +
+  labs(title = "Top 100 scores by Rating")
+```
+
+```{r}
+movies1 %>%
+  arrange(score) %>%
+  select(score, rating) %>%
+  head(100) %>%
+  ggplot(aes(x = score, fill=rating)) +
+  geom_histogram() +
+  theme_bw() +
+  labs(title = "Bottom 100 scores by Rating")
+```
+
+There appears to be even distributions of rating within the distribution of score and within the top 100 and bottom 100 scores. Thus, the rating of a movie does not seem to effect the outcome of score. We will not be including rating in our model.
+
+Let's look at the distribution of score represented by genre. I will split these up so that the smaller distributions are on a smaller scale, and the larger distributions are on a larger scale to better view the data.
+
+```{r}
+movies1 %>%
+  filter(genre != "Family" & genre != "Fantasy" & genre != "Mystery" & 
+           genre != "Romance" & genre != "Sci-Fi" & genre != "Thriller" &
+           genre != "Western") %>%
+  ggplot(aes(x=score)) +
+  geom_histogram(bins=30, color = "white") +
+  facet_wrap(~genre)+
+  labs(title = "Histogram of Score by Genre")
+```
+
+We can see that these genres also have a leftward skew, however, some are shifted more right such as action, biography, drama, and crime, showing that these scores tend to be higher than those of other distributions.
+
+```{r}
+movies1 %>%
+  filter(genre == "Family" | genre == "Fantasy" | genre == "Mystery" | 
+           genre == "Romance" | genre == "Sci-Fi" | genre == "Thriller" | 
+           genre == "Western") %>%
+  ggplot(aes(x=score)) +
+  geom_histogram(bins=30, color = "white") +
+  facet_wrap(~genre)+
+  labs(title = "Histogram of Score by Genre")
+```
+
+Due to the smaller amounts of observations, these genres do not follow the overall distribution of score and appear more stationary.
+
+Overall, through looking at the distribution of score with different genres and ratings, we can confirm that the leftward skew is mainly due to the smaller amount of lower scores within the distribution, however, the different genres do have an effect on the outcome of score. We will develop this relationship between genres and score further on in the EDA.
+
+Next, let us look at the correlation matrix to see the correlation of the numerical variables with the outcome variable score.
+
+```{r}
+movies1 %>%
+  select(where(is.numeric)) %>%
+  cor() %>%
+  corrplot(type = 'lower', diag = FALSE)
+```
+
+All the numeric variables have a positive correlation with score. The highest correlations are between votes and score and run time and score. Thus, these parameters will be influential to our model.
+
+Lets explore the relationship between score and votes more in depth.
+
+```{r}
+movies1 %>%
+  ggplot(aes(x=votes, y=score)) +
+  geom_point() +
+  coord_flip()
+
+```
+
+We can see the positive relationship between score and votes. We can also observe the leftward skew represented in the distribution of score. However, this distribution has a greater left skew, with a higher peak around scores of 8. We can see that votes will be an influential parameter in our outcome of score with smaller amounts of votes have smaller scores, and the highest scores having the greatest amount of votes.
+
+Now lets explore the relationship between score and run time. Note that the red line represents the mean of score.
+
+```{r}
+movies1 %>%
+  ggplot(aes(x = runtime, y = score)) +
+  geom_point() +
+  stat_summary(fun = mean, colour="red", geom="line")
+```
+
+We can observe the positive relationship between run time and score from run times of 50 to 175. However, after 175 the smaller amount of observations stops the positive trend. Between run times of 50 and 100 minutes we have a larger distribution of scores that occur. After 100 minutes, the longer run time appears to cause a larger score. Thus, run time will be an influential parameter in the outcome variable score. Lets observe these relationships with discrete run times.
+
+```{r}
+movies1 %>%
+  ggplot(aes(x = score, fill = discrete_runtime)) +
+  geom_histogram(bins = 60) +
+  theme_bw()
+```
+
+```{r}
+movies1 %>%
+  arrange(-score) %>%
+  select(score, discrete_runtime) %>%
+  head(100) %>%
+  ggplot(aes(x = score, fill=discrete_runtime)) +
+  geom_histogram() +
+  theme_bw() +
+  labs(title = "Top 100 scores by Runtime")
+```
+
+```{r}
+movies1 %>%
+  arrange(score) %>%
+  select(score, discrete_runtime) %>%
+  head(100) %>%
+  ggplot(aes(x = score, fill=discrete_runtime)) +
+  geom_histogram() +
+  theme_bw() +
+  labs(title = "Bottom 100 scores by Runtime")
+```
+
+Again, as we observed above, run times of 120 to 150 minutes appear to result in higher values of score compared to run times below 120 minutes or above 150 minutes. The top 100 scores have majority 90 to 150 minute movies. In comparison, the bottom 100 scores have majority 90-120 minute movies. Run time has a great effect on the score of a movie.
+
+From the correlation matrix, we saw only a small positive correlation between score and year_released. Lets visualize this relationship. Note that the red line represents the mean of score for each year.
+
+```{r}
+movies1 %>%
+  ggplot(aes(x=year_released, y = score)) +
+  geom_point() +
+  stat_summary(fun =mean, colour="red", geom="line")
+```
+
+There is an even distribution of score resulting from different years, with the average score of each year is mostly constant. Therefore I do not believe that year will be an influential parameter in our model.
+
+Let us examine the amount of seasonality present in our data set by looking at the relationship between score and month_released.
+
+```{r}
+movies1 %>%
+  ggplot(aes(x=month_released, y = score)) +
+  geom_boxplot() +
+  labs(y = "Score", x = "Month Released") +
+  theme_bw()
+```
+
+From the box plot, we can observe that the average score across different months is almost equivalent, and the distributions across months are of about equal size. Thus, we can determine that the date of release, both year and month, do not have an effect on our outcome variable score.
+
+From the correlation matrix we also saw a small positive relationship between score and budget from the correlation matrix. Lets visualize this relationship.
+
+```{r}
+movies1 %>%
+  ggplot(aes(x=budget, y = score)) +
+  geom_point()
+```
+
+The distribution of score depending on budget is very close to the actual distribution of score. Thus, I do not believe that budget will be a influential parameter for our model. Similarly, since budget and gross income have a positive correlation of almost 1, we can assume that gross income will also not have an effect on the outcome variable score.
+
+Moving away from the numerical variables in our data set, lets explore the distribution of companies. Due to the large number of different companies, I decided to conduct my descriptive analysis with the top 29 companies for easier viewing.
+
+```{r}
+company_frequent <- movies1 %>%
+  group_by(company) %>%
+  count() %>%
+  arrange(n) %>%
+  filter(n >= 20) %>%
+  pull(company)
+movies1 %>%
+  filter(company %in% company_frequent) %>%
+  ggplot(aes(x=forcats::fct_infreq(company))) +
+  geom_histogram(bins=60, stat='count') +
+  coord_flip() +
+  labs(y="Count", x = "Company") +
+  theme_bw()
+```
+
+We can observe that companies such as Universal Studios, Columbia Pictures, Warner Bros, etc. output many more movies within the data set compared to others. Lets use a box plot to explore the relationship between companies and score to see if companies that produce more movie achieve higher of smaller scores on average.
+
+```{r}
+movies1 %>%
+  filter(company %in% company_frequent) %>%
+  ggplot(aes(x=company, y = score)) +
+  geom_boxplot() +
+  labs(y = "Score", x = "Company") +
+  coord_flip() +
+  theme_bw()
+```
+
+Interestingly, The Weinstein Company had one of the smallest outputs of movies in the top 29 companies but also has the highest average score. It appears that companies in the lower or mid range of movies released tend to have higher scores. We can attribute the saying of "quality over quantity" to this relationship. Overall, we can see that the company producing a movie has a great effect on the overall score a movie will receive due to the differing averages. Interestingly, the size of the distribution does not seem to be effected by the amount of movies a company outputs, and thus the viewers knowledge of the company does not affect the range of score considered when voting.
+
+Lets explore the relationship between stars in a movie with score in a similar fashion. We will consider the top 39 most frequent starts appearing in movies.
+
+```{r}
+star_frequent <- movies1 %>%
+  group_by(star) %>%
+  count() %>%
+  arrange(n) %>%
+  filter(n >= 20) %>%
+  pull(star)
+```
+
+```{r}
+movies1 %>%
+  filter(star %in% star_frequent) %>%
+  ggplot(aes(x=forcats::fct_infreq(star))) +
+  geom_histogram(bins = 60, stat = 'count') +
+  coord_flip() + 
+  labs(x= "Star", y = 'Count') +
+  theme_bw()
+```
+
+```{r}
+movies1 %>%
+  filter(star %in% star_frequent) %>%
+  ggplot(aes(x=star, y = score)) +
+  geom_boxplot() +
+  labs(y = "Score", x = "Star") +
+  coord_flip() +
+  theme_bw()
+```
+
+There appears to be larger differences in the average score for each star within the box plot compared to company. The distributions of each star's score also vary greatly from each other. We can attribute these differences to viewers basing votes on how much they like or dislike an actor in a movie more compared to a company. We will definitely include stars in our model.
+
+Lets look at the relationship between score and the top 15 writers appearing in our data set and the relationship between score and the top 21 directors. Since the story line and how well it is put together is imperative for a movie's score, we expect the writers and directors to have a large impact on the outcome of score.
+
+```{r}
+# WRITER
+writer_frequent <- movies1 %>%
+  group_by(writer) %>%
+  count() %>%
+  arrange(n) %>%
+  filter(n >= 10) %>%
+  pull(writer)
+```
+
+```{r}
+movies1 %>%
+  filter(writer %in% writer_frequent) %>%
+  ggplot(aes(x=forcats::fct_infreq(writer))) +
+  geom_histogram(bins = 60, stat = 'count') +
+  coord_flip() +
+  labs(x="Writer", y="Count") +
+  theme_bw()
+```
+
+```{r}
+movies1 %>%
+  filter(writer %in% writer_frequent) %>%
+  ggplot(aes(x=writer, y = score)) +
+  geom_boxplot() +
+  labs(y = "Score", x = "Writer") +
+  coord_flip() +
+  theme_bw()
+```
+
+```{r}
+director_frequent <- movies1 %>%
+  group_by(director) %>%
+  count() %>%
+  arrange(n) %>%
+  filter(n >= 15) %>%
+  pull(director)
+movies1 %>%
+  filter(director %in% director_frequent) %>%
+  ggplot(aes(x=forcats::fct_infreq(director))) +
+  geom_histogram(bins = 60, stat = 'count') +
+  coord_flip() +
+  labs(x="Director", y="Count") +
+  theme_bw()
+```
+
+```{r}
+movies1 %>%
+  filter(director %in% director_frequent) %>%
+  ggplot(aes(x=director, y = score)) +
+  geom_boxplot() +
+  labs(y = "Score", x = "Director") +
+  coord_flip() +
+  theme_bw()
+```
+
+There appears to be large differences in the distributions and averages in the box plots for both writers and directors. We will be including these two variables in our model.
+
+Previously we explored the relationship between genre and score, and concluded from our brief analysis that genre will be an important parameter in our model. Lets look at the effect of genre further, relating it to both companies and stars.
+
+```{r}
+movies1 %>%
+  filter(company %in% company_frequent) %>%
+  ggplot(aes(x=forcats::fct_infreq(company), fill=genre)) +
+  geom_bar() +
+  coord_flip() +
+  labs(y="Count", x="Company", title = "Distribution of 29 Most Frequent 
+       Companies with Genre")
+```
+
+```{r}
+# top 100 scores by company
+movies1 %>%
+  filter(company %in% company_frequent) %>%
+  arrange(-score) %>%
+  select(score, company, genre) %>%
+  head(100) %>%
+  ggplot(aes(x=forcats::fct_infreq(company), fill=genre)) +
+  geom_bar() +
+  coord_flip() +
+  labs(title = "Top 100 scores by Company and Genre",
+       x = "Company")
+```
+
+```{r}
+# bottom 100 scores by company and genre
+movies1 %>%
+  filter(company %in% company_frequent) %>%
+  arrange(score) %>%
+  select(score, company, genre) %>%
+  head(100) %>%
+  ggplot(aes(x=forcats::fct_infreq(company), fill=genre)) +
+  geom_bar() +
+  coord_flip() +
+  labs(title = "Bottom 100 scores by Company and Genre",
+       x = "Company")
+```
+
+Interestingly, only 9 of the 14 genres are represented in the top 100 scores, and only 7 of the 14 genres are represented in the bottom 100 scores. In the bottom 100 scores, action and comedy appear to be the most prevalent. There is also a larger amount of horror movies and comedy movies in the bottom 100 scores than there are in the top 100. We can attribute this to the large emotions people expect to feel from these movies (laughing or being scared), and if these expectations are not met they may judge more harshly. We can view similar outcomes in the distributions of stars with genre.
+
+```{r}
+movies1 %>%
+  filter(company %in% company_frequent) %>%
+  ggplot(aes(x=forcats::fct_infreq(company), fill=genre)) +
+  geom_bar() +
+  coord_flip() +
+  labs(y="Count", x="Company", title = "Distribution of Top 39 Stars with Genre")
+```
+
+```{r}
+# top 100 scores by star and genre
+movies1 %>%
+  filter(star %in% star_frequent) %>%
+  arrange(-score) %>%
+  select(score, company, genre, star) %>%
+  head(100) %>%
+  ggplot(aes(x=forcats::fct_infreq(star), fill=genre)) +
+  geom_bar() +
+  coord_flip() +
+  labs(title = "Top 100 scores by Star and Genre",
+       x = "Star")
+```
+
+```{r}
+# bottom 100 scores by star
+movies1 %>%
+  filter(star %in% star_frequent) %>%
+  arrange(score) %>%
+  select(score, company, genre, star) %>%
+  head(100) %>%
+  ggplot(aes(x=forcats::fct_infreq(star), fill=genre)) +
+  geom_bar() +
+  coord_flip() +
+  labs(title = "Bottom 100 scores by Star and Genre",
+       x = "Star")
+```
+
+The top 100 scores by star have a similar distribution to the top 100 scores by company. However, in the bottom 100 scores by star, comedy is even more prevalent than it was before, with the majority of the stars acting in mainly comedy movies! From these plots we can conclude that genre, company, and star are very important variables to include in our model.
+
+Previously we decided that run time was another important factor to include in our model. Let's explore the relationship of run time in the top 100 and bottom 100 scores by company.
+
+In conclusion, the variables that will be included in the model are run time, votes, genre, company, star, director, and writer due to their high levels of influence on the outcome of score.
+
+## MODEL FITTING
+
+### Set Up
+
+In order to prepare my data for being trained, I first split my data into a testing and training set. I used a proportion of 0.8, which gave me about 4000 observations in my training set and about 1000 observations in my testing set. I also stratified on my outcome variable score, which will help my model perform better by having an even distribution of score in each set. I also created folds in order to cross-validate my data, and will be an important ingredient in order for me to tune my models further on in this analysis.
+
+```{r}
+movies_split <- initial_split(movies1, prop=0.8,
+                             strata = score)
+movies_train <- training(movies_split)
+movies_test <- testing(movies_split)
+dim(movies_train)
+dim(movies_test)
+# create folds
+movies_fold <- vfold_cv(movies_train, v=5)
+```
+
+Next, I created my recipe for the data, using the predictors found important in my exploratory data analysis. Using a student's final paper on gaucho space as a guide, I decided to create a threshold in my recipe for star, company, director, and writer. Thus, the observations in these categories will only be included if they occur in the data set a set amount of times. This was imperative in my model to cut down run time due to the many different values contained in these data sets. I also used step_dummy in order to deal with all my categorical variable genre, and normalized all my predictors.
+
+```{r}
+movies_recipe <- recipe(score~ runtime + votes + genre + 
+                          company + star + director + writer,
+                        data = movies_train) %>%
+  step_other(star, threshold = 25) %>%
+  step_other(company, threshold = 40) %>%
+  step_other(director, threshold = 15) %>%
+  step_other(writer, threshold = 5) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_normalize(all_predictors())
+```
+
+### Pruned Tree Model
+
+I began with constructing a simple pruned tree model, with the hopes of answering if I would want a more complex model such as a random forest model. In order to construct my pruned tree model, I made a workflow, in which I defined that I was going to tune cost_complexity, created a grid for my cost complexity values, and tuned the model using the folds created above.
+
+```{r}
+# model
+pruned_tree_model <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("regression")
+# workflow
+pruned_tree_tune_wkflow <- workflow() %>%
+  add_model(pruned_tree_model %>%
+              set_args(cost_complexity = tune())) %>%
+  add_recipe(movies_recipe)
+# create grid for values of cost complexity 
+pruned_cost_grid <- grid_regular(cost_complexity(range(-3,-1)), 
+                                 levels=10)
+# tune
+pruned_tune_res <- tune_grid(
+  pruned_tree_tune_wkflow,
+  resamples = movies_fold,
+  grid = pruned_cost_grid)
+```
+
+I then plotted the resulting rsq and rmse values for different values of cost complexity
+
+```{r}
+autoplot(pruned_tune_res)
+
+```
+
+From the plot we can see that our model behaved the best (had the lowest rmse value) at lower complexity values, with the optimal point occurring around .0025. Thus, we can assume that we need a more complex model such as a random forest. However, before moving on, lets get out optimal cost complexity based on rmse values, and examine the results of our pruned tree model on the testing data.
+
+```{r}
+best_complexity <- select_best(pruned_tune_res,
+                               metric = "rmse")
+best_complexity
+pruned_tree_tune_final <- finalize_workflow(
+  pruned_tree_tune_wkflow, best_complexity)
+pruned_tree_tune_final_fit <- fit(
+  pruned_tree_tune_final,
+  data = movies_train)
+```
+
+```{r}
+# visualize the model
+pruned_tree_tune_final_fit %>%
+  extract_fit_engine() %>%
+  rpart.plot()
+
+```
+
+As observed from the rmse and cost-complexity plot, our model performed best with a more complex tree.
+
+```{r}
+# check performance
+augment(pruned_tree_tune_final_fit, new_data = movies_train) %>%  
+  rmse(truth = score, estimate = .pred)
+```
+
+Overall, we obtained an rmse value of 0.72 on the training data. Lets visualize this result by plotting the observed versus expected vaues.
+
+```{r}
+augment(pruned_tree_tune_final_fit,
+        new_data = movies_train) %>%
+  ggplot(aes(score, .pred)) +
+  geom_abline() +
+  geom_point(alpha = 0.5)
+```
+
+Overall, our model did not perform that great. We got a relatively high rmse value, and our graph is looking quite odd and not following the overall distribution of score well.
+
+### Random Forest Model
+
+From our pruned tree anlaysis we determined that a more complex model would serve our dataset better. Thus, we will constucted a random forest model. In order to do this, I created a specification with the engine "ranger", put importance = "impurity" to use the Gini index and created a workflow specifying I woul be tuning mtry, trees, and min_n. I created a grid with possible values, and chose I range of 1 to 7 for mtry, because we want at least one predictor and have a maximum of 7 predictors in the recipe. I created a range of 10 to 50 for trees, and a range of 1 to 100 for min_n, which specifies the smalles amount of observations to have at a node for it to stop. I then tuned my model, which took around 45 minutes, and then saved the results so I would not have to run it again.
+
+```{r RF Model Wkflow + Tuning, eval=FALSE, include=FALSE}
+# create spec for rf
+rf_model <- rand_forest() %>%
+  set_mode("regression") %>%
+  set_engine("ranger", importance = "impurity") #use Gini index 
+# create workflow for rf
+rf_wkflow <- workflow() %>%
+  add_model(rf_model %>%
+              set_args(mtry=tune(), trees=tune(),
+              min_n = tune())) %>%
+  add_recipe(movies_recipe)
+# grid for different numbers of predictors 
+rf_param_grid <- grid_regular(
+  mtry(range=c(1,7)),
+  trees(range=c(10,50)),
+  min_n(range=c(1,100)),  levels=10)
+rf_param_res <- tune_grid(rf_wkflow,
+                          resamples = movies_fold,
+                          grid = rf_param_grid)
+save(rf_param_res, rf_wkflow, file = "random_forest_runs.rda")
+```
+
+After tuning the model, I output the results in order to see the effects of different minimal node size, predictors, and trees on the rmse value of the folds.
+
+```{r RF Plot of tuning, echo=TRUE}
+load(file = "random_forest_runs.rda")
+autoplot(rf_param_res, metric = "rmse")
+```
+
+From the plot we observe that the model obtains a better rmse score when the number of selected parameters increases and the minimal number of nodes is 12. In addition, the model does best with trees past 35.
+
+Next, we will use select_best to select the best min_n, trees, and mtry combination from the plot above and fit out model to it with the training set.
+
+```{r pick best rf model and fit}
+best_predictors <- select_best(rf_param_res,
+                               metric = "rmse")
+best_predictors
+rf_final <- finalize_workflow(
+  rf_wkflow, best_predictors)
+rf_final_fit <- fit(
+  rf_final,
+  data = movies_train)
+```
+
+As we observed from the plot, the model performed best with a minimal node size of 12, 45 trees, and all 7 of the predictors. Now let's see how this model performed on the training by viewing the rmse value.
+
+```{r peformance of rf on training set}
+augment(rf_final_fit,
+        new_data = movies_train) %>%
+  rmse(truth = score, estimate = .pred)
+```
+
+Interestingly we got a worse rmse value from our random forest model that we did from the pruned tree. Lets view a plot of our predicted and expected values.
+
+```{r}
+augment(rf_final_fit,
+        new_data = movies_train) %>%
+  ggplot(aes(score, .pred)) +
+  geom_abline() +
+  geom_point(alpha = 0.5)
+```
+
+From the plot we observe what our rmse value told use above, our model is not predicting very well. We would hope to see the predicted values following the straight line, however, there appears to be a large distribution around the actual values. From the plot, it appears that out model results have high variance and low bias. Thus, our model has predictions that are inaccurate and inconsistent on average.
+
+### Boosted Tree Model
+
+Next, we will fit a boosted tree model to the data set. In order to do this, we will set up an specification for a boosted model using the engine "xgboost", create a workflow in which we will specify that we are tuning trees and mtry, add out movies recipe, create a grid for the different parameter values, and then tune the model. I decided to choose a range of 1 to 500 for the trees, a range of 1 to 7 for predicotrs, and a range of 1 to 100 for the minimal node size. Due to the long run time of tuning my model, I saved the results so I would not have to run them again while knitting the file.
+
+```{r eval=FALSE, include=TRUE}
+# create spec
+boost_model <- boost_tree() %>%
+  set_engine("xgboost") %>%
+  set_mode("regression")
+# create workflow 
+boost_wkflow <- workflow() %>%
+  add_model(boost_model %>%
+              set_args(trees = tune(), 
+                       mtry = tune(),
+                       min_n = tune()) %>%
+  add_recipe(movies_recipe)
+# grid for different values
+boost_param_grid <- grid_regular(
+  mtry(range=c(1,7)),
+  trees(range=c(1,500)),
+  min_n(range = c(1,100),levels=10)
+# results for different models
+boost_param_res <- tune_grid(rf_wkflow,
+                          resamples = movies_fold,
+                          grid = rf_param_grid)
+save(boost_param_res, boost_wkflow, file = "boosted_runs.rda")
+```
+
+Let's visualize the results of different parameter values.
+
+```{r}
+load(file = "boosted_runs.rda")
+autoplot(boost_param_res,metric = "rmse")
+```
+
+As we observed from the random forest model, our boosted model performed best with the highest amount of predictors, the smaller minimal node size, and around 30 to 40 trees. Lets select the best combination of the predictors above using select_best.
+
+```{r}
+best_boost_res <- select_best(boost_param_res,
+                               metric = "rmse")
+best_boost_res
+boost_final <- finalize_workflow(
+  boost_wkflow, best_boost_res)
+boost_final_fit <- fit(
+  boost_final,
+  data = movies_train)
+```
+
+Let's see how our model performed on the training data set.
+
+```{r}
+augment(boost_final_fit,
+        new_data = movies_train) %>%
+  rmse(truth = score, estimate = .pred)
+```
+
+We got a value of 0.696 for the rmse, which is our smallest value yet! Let's look a the observed versus expected graph.
+
+```{r}
+augment(boost_final_fit,
+        new_data = movies_train) %>%
+  ggplot(aes(score, .pred)) +
+  geom_abline() +
+  geom_point(alpha = 0.5)
+```
+
+The plot looks similar to that of our random forest, however, the boosted tree model tends to follow the expected line much better. The boosted model appears to have lower variance and higher bias than the random forest model.
+
+### Nearest Neighbor Model
+Lastly, we will fit a nearest neighbor model to the data set. In order to do this, we will set up a specification for a nearest neighbor model using the engine "kknn", create a workflow, a create a parameter grid for the different values of neighbors. The code for this portion was borrowed from the example final project. 
+```{r}
+knn_model <- 
+  nearest_neighbor(
+    neighbors = tune(),
+    mode = "regression") %>% 
+  set_engine("kknn")
+
+knn_workflow <- workflow() %>% 
+  add_model(knn_model) %>% 
+  add_recipe(movies_recipe)
+
+# define grid
+knn_grid <- grid_regular(neighbors(range = c(1,10)), levels = 10)
+
+tune_knn <- tune_grid(knn_workflow,
+                        resamples = movies_fold,
+                        grid = knn_grid)
+```
+Let's visualize the result of different neighbors values.
+```{r}
+autoplot(tune_knn, metric = "rmse")
+
+```
+From the plot we can observe that our model performs best with 10 neighbors. Let's select our best model, finalize the workflow, and see how the model performs on the testing set. 
+```{r}
+# select best model 
+best_knn_res <- select_best(tune_knn,
+                              metric = "rmse")
+knn_final <- finalize_workflow(
+  knn_workflow, best_knn_res)
+knn_final_fit <- fit(
+  knn_final,
+  data = movies_train)
+# check performance
+augment(knn_final_fit,
+        new_data = movies_train) %>%
+  rmse(truth = score, estimate = .pred)
+```
+```{r}
+# plot the true versus the predicted values
+augment(knn_final_fit,
+        new_data = movies_train) %>%
+  ggplot(aes(score, .pred)) +
+  geom_abline() +
+  geom_point(alpha = 0.5)
+```
+From our rmse value and plot above, we observe that our nearest neighbros model performs the best out of all the models.
+
+### Final Model 
+W will use our nearest neighbors model since it obtained the lowest rmse value.  
+
+### Analysis of the Test Set 
+```{r}
+augment(knn_final_fit,
+        new_data = movies_test) %>%
+  rmse(truth = score, estimate = .pred)
+```
+
+```{r}
+augment(knn_final_fit,
+        new_data = movies_test) %>%
+  ggplot(aes(score, .pred)) +
+  geom_abline() +
+  geom_point(alpha = 0.5)
+```
+
+Overall, our optimal model of nearest neighbors did not perform well on the testing data. We received an rmse score of 0.7758 which is relatively high, and from the plot above we can see that our model does not predict the outcome very well.The model appears to have low bias and high variance where the predicted values have a large range around the actual values. 
+
+## CONCLUSION 
+Overall, from the result of our final model tested against the test data, we saw that our model did not predict very well. This could be due to leaving out certain variable that we did not consider important during the EDA and could also be due to the thresholds we created in our recipe. We must also keep in mind that a movie rating is highly subjective, and everyone's rating criterion might be different in how it related to the predictors in our models. In order for our model to correctly predict a rating, it might have to be on an individual rather than group level. For example, it would be interesting to use my personal Netflix data and the ratings I had given on movies to predict future ratings. 
+
+Regardless of the outcome of the model, the movies data set was an interesting way to see what were the most influential parameters when predicting the score of a movie. 

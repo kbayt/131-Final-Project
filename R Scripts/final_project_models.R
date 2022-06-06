@@ -26,7 +26,7 @@ movies_recipe <- recipe(score~ runtime + votes + genre +
   step_other(company, threshold = 40) %>%
   step_other(director, threshold = 15) %>%
   step_other(writer, threshold = 5) %>%
-  step_dummy(genre) %>%
+  step_dummy(all_nominal_predictors()) %>%
   step_normalize(all_predictors())
 
 # 1. LINEAR REGRESSION
