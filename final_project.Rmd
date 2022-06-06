@@ -634,7 +634,7 @@ augment(pruned_tree_tune_final_fit,
   geom_point(alpha = 0.5)
 ```
 
-Overall, our model did not perform that great. We got a relatively high rmse value, and our graph is looking quite odd and not following the overall distribution of score well.
+Overall, our model did not perform that great. We got a relatively high rmse value, and our model appears to have high bias and high variance since the model is predicting the same value for a large range of actual values. 
 
 ### Random Forest Model
 
