@@ -631,7 +631,7 @@ augment(pruned_tree_tune_final_fit,
         new_data = movies_train) %>%
   ggplot(aes(score, .pred)) +
   geom_abline() +
-  geom_point(alpha = 0.5)
+  geom_point(alpha = 0.5) 
 ```
 
 Overall, our model did not perform that great. We got a relatively high rmse value, and our model appears to have high bias and high variance since the model is predicting the same value for a large range of actual values. 
